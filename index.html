@@ -6,6 +6,7 @@
 <title>Distrimega CRM</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@1,400;1,500;1,600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#0b0b0d;--panel:rgba(255,255,255,.06);--panel2:rgba(255,255,255,.10);--border:rgba(255,255,255,.12);--border2:rgba(255,255,255,.22);--txt:#fff;--txt2:rgba(255,255,255,.78);--txt3:rgba(255,255,255,.45);--orange:#e8702a;--orange2:#d2611f;--green:#3ddc84;--red:#ff5c5c;--blue:#5ca8ff;--yellow:#ffc857;--wa:#25d366;--purple:#a875ff}
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif;letter-spacing:-.02em}
@@ -782,9 +783,60 @@ if(!s.proveedores)s.proveedores=[];if(!s.productos)s.productos=[];
 if(!s.ui)s.ui={};if(s.ui.viewAs===undefined)s.ui.viewAs=null;if(!s.ui.wzTipo)s.ui.wzTipo='cliente';
 return s;
 }
-let S=norm(load());
+let S=JSON.parse(JSON.stringify(DEF));
+const SB_URL='https://mteygebgjontulocpbys.supabase.co';
+const SB_KEY='sb_publishable_dXRY4OyK6b0stzFwwXZ6VA_marQhSF1';
+let SB=null;let _dbReady=false;
+const DB_MAP={
+ usuarios:{tb:'usuarios',pk:'id',
+  out:o=>({id:o.id,nombre:o.nombre,correo:o.correo,telefono:o.telefono||'',pass_hash:o.passHash,rol:o.rol||'',permisos:o.permisos||{},bienvenida:o.bienvenida||{activo:false,texto:''},activo:o.activo!==false,creado:o.creado}),
+  in:r=>({id:r.id,nombre:r.nombre,correo:r.correo,telefono:r.telefono||'',passHash:r.pass_hash,rol:r.rol||'',permisos:r.permisos||{},bienvenida:r.bienvenida||{activo:false,texto:''},activo:r.activo!==false,creado:r.creado})},
+ clientes:{tb:'clientes',pk:'id',
+  out:o=>({id:o.id,nombre:o.n||'',telefono:o.tel||'',ciudad:o.ciu||'',origen:o.origen||'Otro',vendedor_id:o.vendedorId||null,ventas:o.ventas||[],creado:o.creado}),
+  in:r=>({id:r.id,n:r.nombre,tel:r.telefono||'',ciu:r.ciudad||'',origen:r.origen||'Otro',vendedorId:r.vendedor_id||'',ventas:r.ventas||[],creado:r.creado})},
+ leads:{tb:'leads',pk:'id',
+  out:o=>({id:o.id,nombre:o.n||'',contacto:o.c||'',telefono:o.tel||'',origen:o.org||'',etapa:o.et||'Nuevo',vendedor_id:o.vendedorId||null,conversacion_id:o.conversacionId||null,origen_wazzup:!!o.origenWazzup,creado:o.creado}),
+  in:r=>({id:r.id,n:r.nombre,c:r.contacto||'',tel:r.telefono||'',org:r.origen||'',et:r.etapa||'Nuevo',vendedorId:r.vendedor_id||'',conversacionId:r.conversacion_id||null,origenWazzup:!!r.origen_wazzup,creado:r.creado})},
+ opps:{tb:'oportunidades',pk:'id',
+  out:o=>({id:o.id,titulo:o.t||'',cliente:o.c||'',monto:Number(o.m)||0,etapa:Number(o.e)||0,vendedor_id:o.vendedorId||null,fecha_seguimiento:o.fechaSeguimiento||'',creado:o.creado}),
+  in:r=>({id:r.id,t:r.titulo,c:r.cliente||'',m:Number(r.monto)||0,e:Number(r.etapa)||0,vendedorId:r.vendedor_id||'',fechaSeguimiento:r.fecha_seguimiento||'',creado:r.creado})},
+ conversaciones:{tb:'conversaciones',pk:'id',
+  out:o=>({id:o.id,telefono:o.telefono||'',contacto_nombre:o.contactoNombre||'',tipo:o.tipo||'cliente',lead_id:o.leadId||null,vendedor_id:o.vendedorId||null,mensajes:(o.mensajes||[]).map(m=>({...m,adj:m.adj?{...m.adj,attId:undefined,data:undefined}:undefined})),respondida:!!o.respondida,creado:o.creado,actualizado:o.actualizado||o.creado}),
+  in:r=>({id:r.id,telefono:r.telefono||'',contactoNombre:r.contacto_nombre||'',tipo:r.tipo||'cliente',leadId:r.lead_id||null,vendedorId:r.vendedor_id||'',mensajes:r.mensajes||[],respondida:!!r.respondida,creado:r.creado,actualizado:r.actualizado})},
+ productos:{tb:'productos',pk:'id',
+  out:o=>({id:o.id,nombre:o.nombre,precio:Number(o.precio)||0,creado:o.creado}),
+  in:r=>({id:r.id,nombre:r.nombre,precio:Number(r.precio)||0,creado:r.creado})},
+ proveedores:{tb:'proveedores',pk:'id',
+  out:o=>({id:o.id,nombre:o.nombre||'',empresa:o.empresa||'',telefono:o.tel||'',vendedor_id:o.vendedorId||null,creado:o.creado}),
+  in:r=>({id:r.id,nombre:r.nombre,empresa:r.empresa||'',tel:r.telefono||'',vendedorId:r.vendedor_id||'',creado:r.creado})},
+ recordatorios:{tb:'recordatorios',pk:'id',
+  out:o=>({id:o.id,titulo:o.t||'',cliente:o.cliente||'',fecha:o.fecha||'',opp_id:o.oppId||null,hecho:!!o.hecho}),
+  in:r=>({id:r.id,t:r.titulo,cliente:r.cliente||'',fecha:r.fecha||'',oppId:r.opp_id,hecho:!!r.hecho})},
+ notif:{tb:'notificaciones',pk:'id',
+  out:o=>({id:o.id,tipo:o.tipo||'',titulo:o.titulo||'',detalle:o.detalle||'',leido:false,creado:o.creado||new Date().toISOString()}),
+  in:r=>({id:r.id,tipo:r.tipo,titulo:r.titulo,detalle:r.detalle,creado:r.creado})},
+ audit:{tb:'auditoria',pk:'id',
+  out:o=>({id:o.id,ts:o.ts,user_id:o.uid||null,user_name:o.userName||'',user_rol:o.userRol||'',accion:o.accion||'',entidad:o.entidad||'',detalle:o.detalle||'',antes:o.antes,despues:o.despues}),
+  in:r=>({id:r.id,ts:r.ts,uid:r.user_id,userName:r.user_name||'',userRol:r.user_rol||'',accion:r.accion,entidad:r.entidad,detalle:r.detalle||'',antes:r.antes,despues:r.despues})}
+};
+let _lastSnap={};
+function snapIds(k){return new Set((S[k]||[]).map(x=>x.id))}
+function takeSnap(){_lastSnap={};Object.keys(DB_MAP).forEach(k=>{_lastSnap[k]=snapIds(k)})}
+async function dbLoad(){if(!window.supabase){return false}SB=window.supabase.createClient(SB_URL,SB_KEY);try{const ks=Object.keys(DB_MAP);for(const k of ks){const m=DB_MAP[k];let q=SB.from(m.tb).select('*');if(k==='audit')q=q.order('ts',{ascending:false}).limit(2000);else if(k==='notif')q=q.order('creado',{ascending:false}).limit(20);const{data,error}=await q;if(error){console.warn('dbLoad '+k+':',error.message);continue}S[k]=(data||[]).map(m.in)}const{data:cfg}=await SB.from('configuracion').select('*').eq('id','main').single();if(cfg){S.config={miWa:cfg.mi_wa||'',autoLead:cfg.auto_lead!==false,dist:cfg.distribucion||'aleatoria',apiKey:cfg.api_key||'',apiProv:cfg.api_prov||'',apiOn:!!cfg.api_on}}_dbReady=true;takeSnap();dbSubscribe();return true}catch(e){console.warn('dbLoad fail:',e);return false}}
+let _rtCh=[],_renderT=null,_applyingRemote=false;
+function scheduleRender(){clearTimeout(_renderT);_renderT=setTimeout(()=>{try{rA()}catch{}},120)}
+function applyRemote(k,ev,row,old){const m=DB_MAP[k];_applyingRemote=true;try{if(ev==='DELETE'){const id=(old&&old.id)||(row&&row.id);if(id)S[k]=(S[k]||[]).filter(x=>x.id!==id)}else{const obj=m.in(row);if(!S[k])S[k]=[];const idx=S[k].findIndex(x=>x.id===obj.id);if(idx>=0)S[k][idx]=obj;else S[k].unshift(obj)}try{localStorage.setItem(LS,JSON.stringify(S))}catch{}if(_lastSnap[k]){if(ev==='DELETE'){const id=(old&&old.id)||(row&&row.id);if(id)_lastSnap[k].delete(id)}else _lastSnap[k].add(row.id)}}finally{_applyingRemote=false}scheduleRender()}
+function applyRemoteConfig(row){_applyingRemote=true;try{S.config={miWa:row.mi_wa||'',autoLead:row.auto_lead!==false,dist:row.distribucion||'aleatoria',apiKey:row.api_key||'',apiProv:row.api_prov||'',apiOn:!!row.api_on};try{localStorage.setItem(LS,JSON.stringify(S))}catch{}}finally{_applyingRemote=false}scheduleRender()}
+function dbSubscribe(){if(!SB)return;_rtCh.forEach(c=>{try{SB.removeChannel(c)}catch{}});_rtCh=[];
+ for(const k of Object.keys(DB_MAP)){const m=DB_MAP[k];const ch=SB.channel('rt:'+m.tb).on('postgres_changes',{event:'*',schema:'public',table:m.tb},pl=>{if(_syncing)return;applyRemote(k,pl.eventType,pl.new||{},pl.old||{})}).subscribe();_rtCh.push(ch)}
+ const cc=SB.channel('rt:configuracion').on('postgres_changes',{event:'*',schema:'public',table:'configuracion'},pl=>{if(_syncing||!pl.new)return;applyRemoteConfig(pl.new)}).subscribe();_rtCh.push(cc)}
+let _syncT=null,_syncing=false,_syncDirty=false;
+function dbSync(){if(!_dbReady||!SB){return}if(_syncing){_syncDirty=true;return}_syncing=true;_syncDirty=false;
+ (async()=>{try{const cfg={id:'main',mi_wa:S.config.miWa||'',auto_lead:!!S.config.autoLead,distribucion:S.config.dist||'aleatoria',api_key:S.config.apiKey||'',api_prov:S.config.apiProv||'',api_on:!!S.config.apiOn};await SB.from('configuracion').upsert(cfg);
+  for(const k of Object.keys(DB_MAP)){const m=DB_MAP[k];const arr=S[k]||[];const cur=new Set(arr.map(x=>x.id));const prev=_lastSnap[k]||new Set();const toDel=[...prev].filter(id=>!cur.has(id));if(toDel.length){await SB.from(m.tb).delete().in('id',toDel)}if(arr.length){const rows=arr.map(m.out);for(let i=0;i<rows.length;i+=500){await SB.from(m.tb).upsert(rows.slice(i,i+500),{onConflict:'id'})}}_lastSnap[k]=cur}}catch(e){console.warn('dbSync err:',e)}_syncing=false;if(_syncDirty)setTimeout(dbSync,200)})()}
 function load(){try{const r=localStorage.getItem(LS);if(!r)return JSON.parse(JSON.stringify(DEF));const p=JSON.parse(r);for(const k in DEF)if(!(k in p))p[k]=JSON.parse(JSON.stringify(DEF[k]));return p}catch{return JSON.parse(JSON.stringify(DEF))}}
-function sv(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){tst('No se pudo guardar: archivo demasiado grande para el almacenamiento local')}}
+function sv(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){tst('No se pudo guardar: archivo demasiado grande para el almacenamiento local')}if(_dbReady&&!_applyingRemote){clearTimeout(_syncT);_syncT=setTimeout(dbSync,600)}}
+async function bootstrap(){const ok=await dbLoad();if(!ok){S=norm(load())}else{S.sesion=load().sesion||{uid:null};S.ui=load().ui||DEF.ui;for(const k in DEF)if(!(k in S))S[k]=JSON.parse(JSON.stringify(DEF[k]));S=norm(S)}const u=uA();if(u){iniA()}else{mLanding()}}
 function fG(n){if(!n)return'₲ 0';if(n>=1e9)return'₲ '+(n/1e9).toFixed(2)+' MM';if(n>=1e6)return'₲ '+(n/1e6).toFixed(1)+' M';if(n>=1e3)return'₲ '+Math.round(n/1e3)+' K';return'₲ '+n.toLocaleString('es-PY')}
 function fGF(n){return'₲ '+(n||0).toLocaleString('es-PY')}
 function pN(s){if(typeof s==='number')return s;return parseInt(String(s||'').replace(/[^\d]/g,''))||0}
@@ -1304,7 +1356,7 @@ h+='</tbody></table></div>';w.innerHTML=h}
 
 function rA(){rVF();rRg();rAd();rVn();rCli();rLd();rOp();rD();rN();rSP();rWS();rCv();rAC();rInv();rProv();rEst();rMsg();rAdm();rAud();rBienv();updBvDot();applyNav()}
 
-if(S.sesion.uid&&uA())iniA();else mLanding();
+bootstrap();
 </script>
 </body>
 </html>
