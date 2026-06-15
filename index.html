@@ -824,7 +824,7 @@ function snapIds(k){return new Set((S[k]||[]).map(x=>x.id))}
 function takeSnap(){_lastSnap={};Object.keys(DB_MAP).forEach(k=>{_lastSnap[k]=snapIds(k)})}
 async function dbLoad(){if(!window.supabase){return false}SB=window.supabase.createClient(SB_URL,SB_KEY);try{const ks=Object.keys(DB_MAP);for(const k of ks){const m=DB_MAP[k];let q=SB.from(m.tb).select('*');if(k==='audit')q=q.order('ts',{ascending:false}).limit(2000);else if(k==='notif')q=q.order('creado',{ascending:false}).limit(20);const{data,error}=await q;if(error){console.warn('dbLoad '+k+':',error.message);continue}S[k]=(data||[]).map(m.in)}const{data:cfg}=await SB.from('configuracion').select('*').eq('id','main').single();if(cfg){S.config={miWa:cfg.mi_wa||'',autoLead:cfg.auto_lead!==false,dist:cfg.distribucion||'aleatoria',apiKey:cfg.api_key||'',apiProv:cfg.api_prov||'',apiOn:!!cfg.api_on}}_dbReady=true;takeSnap();dbSubscribe();return true}catch(e){console.warn('dbLoad fail:',e);return false}}
 let _rtCh=[],_renderT=null,_applyingRemote=false;
-function scheduleRender(){clearTimeout(_renderT);_renderT=setTimeout(()=>{try{rA()}catch{}},120)}
+function scheduleRender(){clearTimeout(_renderT);_renderT=setTimeout(()=>{try{const inp=document.getElementById('wIn');const isFocused=inp&&document.activeElement===inp;if(isFocused){rCv();rSP();rD();scheduleRender()}else{rA()}}catch{}},120)}
 function applyRemote(k,ev,row,old){const m=DB_MAP[k];_applyingRemote=true;try{if(ev==='DELETE'){const id=(old&&old.id)||(row&&row.id);if(id)S[k]=(S[k]||[]).filter(x=>x.id!==id)}else{const obj=m.in(row);if(!S[k])S[k]=[];const idx=S[k].findIndex(x=>x.id===obj.id);if(idx>=0)S[k][idx]=obj;else S[k].unshift(obj)}try{localStorage.setItem(LS,JSON.stringify(S))}catch{}if(_lastSnap[k]){if(ev==='DELETE'){const id=(old&&old.id)||(row&&row.id);if(id)_lastSnap[k].delete(id)}else _lastSnap[k].add(row.id)}}finally{_applyingRemote=false}scheduleRender()}
 function applyRemoteConfig(row){_applyingRemote=true;try{S.config={miWa:row.mi_wa||'',autoLead:row.auto_lead!==false,dist:row.distribucion||'aleatoria',apiKey:row.api_key||'',apiProv:row.api_prov||'',apiOn:!!row.api_on};try{localStorage.setItem(LS,JSON.stringify(S))}catch{}}finally{_applyingRemote=false}scheduleRender()}
 function dbSubscribe(){if(!SB){console.warn('❌ SB no inicializado');return}
@@ -868,7 +868,7 @@ function dbSync(){if(!_dbReady||!SB){return}if(_syncing){_syncDirty=true;return}
   for(const k of Object.keys(DB_MAP)){const m=DB_MAP[k];const arr=S[k]||[];const cur=new Set(arr.map(x=>x.id));const prev=_lastSnap[k]||new Set();const toDel=[...prev].filter(id=>!cur.has(id));if(toDel.length){await SB.from(m.tb).delete().in('id',toDel)}if(arr.length){const rows=arr.map(m.out);for(let i=0;i<rows.length;i+=500){await SB.from(m.tb).upsert(rows.slice(i,i+500),{onConflict:'id'})}}_lastSnap[k]=cur}}catch(e){console.warn('dbSync err:',e)}_syncing=false;if(_syncDirty)setTimeout(dbSync,200)})()}
 function load(){try{const r=localStorage.getItem(LS);if(!r)return JSON.parse(JSON.stringify(DEF));const p=JSON.parse(r);for(const k in DEF)if(!(k in p))p[k]=JSON.parse(JSON.stringify(DEF[k]));return p}catch{return JSON.parse(JSON.stringify(DEF))}}
 function sv(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){tst('No se pudo guardar: archivo demasiado grande para el almacenamiento local')}if(_dbReady&&!_applyingRemote){clearTimeout(_syncT);_syncT=setTimeout(dbSync,600)}}
-async function bootstrap(){const ok=await dbLoad();if(!ok){S=norm(load())}else{S.sesion=load().sesion||{uid:null};S.ui=load().ui||DEF.ui;for(const k in DEF)if(!(k in S))S[k]=JSON.parse(JSON.stringify(DEF[k]));S=norm(S)}const u=uA();if(u){iniA()}else{mLanding()}}
+async function bootstrap(){const ok=await dbLoad();if(!ok){S=norm(load())}else{S.sesion=load().sesion||{uid:null};S.ui=load().ui||DEF.ui;for(const k in DEF)if(!(k in S))S[k]=JSON.parse(JSON.stringify(DEF[k]));S=norm(S)}if(_dbReady){ensureStorageBucket().catch(e=>console.warn('Storage init fail:',e))}const u=uA();if(u){iniA()}else{mLanding()}}
 function fG(n){if(!n)return'₲ 0';if(n>=1e9)return'₲ '+(n/1e9).toFixed(2)+' MM';if(n>=1e6)return'₲ '+(n/1e6).toFixed(1)+' M';if(n>=1e3)return'₲ '+Math.round(n/1e3)+' K';return'₲ '+n.toLocaleString('es-PY')}
 function fGF(n){return'₲ '+(n||0).toLocaleString('es-PY')}
 function pN(s){if(typeof s==='number')return s;return parseInt(String(s||'').replace(/[^\d]/g,''))||0}
@@ -889,9 +889,11 @@ function pv(){const u=uA();if(!u)return{role:'',vid:null,name:''};if(u.rol==='ad
 function scopeVid(){const p=pv();return p.role==='vendedor'?p.vid:null}
 function isAdminView(){return pv().role==='admin'}
 function canSee(p){if(p==='*'||p==='perfil')return true;const v=pv();if(['administracion','registro','administradores','vendedores','historial'].includes(p))return v.role==='admin';if(p==='mensajes')return v.role==='admin'||v.role==='vendedor';if(p==='bienvenida')return true;if(p==='estadisticas')return v.role==='admin'||(v.role==='vendedor'&&v.perms&&v.perms.dashboard);if(v.role==='admin')return true;if(v.role==='sinrol')return false;return!!(v.perms&&v.perms[p]===true)}
-function storeAtt(at){if(!at)return undefined;const k=uid();ATT[k]=at.data;return{type:at.type,name:at.name,size:at.size,mime:at.mime,attId:k}}
+async function ensureStorageBucket(){if(!SB){return}try{const{data:buckets}=await SB.storage.listBuckets();if(buckets.some(b=>b.name==='distrimega-files')){console.log('✅ Storage bucket ya existe');return true}console.log('📦 Creando bucket storage...');const{data,error}=await SB.storage.createBucket('distrimega-files',{public:true,allowedMimeTypes:['audio/*','image/*','video/*','application/octet-stream'],fileSizeLimit:50*1024*1024});if(error){console.warn('⚠️ Bucket create:',error.message);return false}console.log('✅ Bucket creado');return true}catch(e){console.warn('⚠️ Bucket check fail:',e.message);return false}}
+async function uploadAttToStorage(convId,attId){if(!SB||!attId||attId.startsWith('remote-')){return}const at=ATT[attId];if(!at){return}try{const fname=(Math.random().toString(36)+at.name).slice(2);const path='conv-'+convId+'/'+fname;const blob=new Blob([at],{type:at.type});const{data,error}=await SB.storage.from('distrimega-files').upload(path,blob);if(error)throw error;const{data:{publicUrl}}=SB.storage.from('distrimega-files').getPublicUrl(path);const attRow={id:attId,nombre:at.name||fname,mime:at.type||'application/octet-stream',size:at.byteLength||0,ruta:path,url:publicUrl,conversacion_id:convId};await SB.from('archivos').insert([attRow]);console.log('✅ Archivo subido:',publicUrl);delete ATT[attId]}catch(e){console.warn('⚠️ Storage upload fail:',e.message)}}
+
 function log(accion,entidad,detalle,antes,despues){const u=uA();if(!S.audit)S.audit=[];S.audit.unshift({id:uid(),ts:nI(),uid:u?u.id:null,userName:u?u.nombre:'Sistema',userRol:u?(u.rol||'sin rol'):'sistema',accion,entidad,detalle:detalle||'',antes:(antes===undefined?null:antes),despues:(despues===undefined?null:despues)});if(S.audit.length>2000)S.audit=S.audit.slice(0,2000)}
-function attData(a){if(!a)return null;if(a.attId)return ATT[a.attId]||null;return a.data||null}
+function attData(a){if(!a)return null;if(a.url)return a.url;if(a.attId&&a.attId.startsWith('remote-'))return ATT[a.attId]||null;if(a.attId)return ATT[a.attId]||null;return a.data||null}
 function rT(iso){if(!iso)return'';const d=new Date(iso),n=new Date();const m=Math.floor((n-d)/60000);if(m<1)return'ahora';if(m<60)return m+'m';const h=Math.floor(m/60);if(h<24)return h+'h';const dd=Math.floor(h/24);if(dd===1)return'ayer';if(dd<7)return dd+'d';return d.toLocaleDateString('es-PY',{day:'numeric',month:'short'})}
 function vN(id){if(!id)return'Sin asignar';const u=S.usuarios.find(x=>x.id===id);return u?u.nombre:'Sin asignar'}
 function vAct(){return S.usuarios.filter(u=>u.rol==='vendedor'&&u.activo)}
@@ -913,10 +915,10 @@ ${S.usuarios.length===0?'<div style="font-size:12px;color:var(--txt3);text-align
 document.getElementById('aTit').innerHTML='Bienvenido a <em>Distrimega</em>';
 document.getElementById('aSub').textContent='Ingresá con tu cuenta.';
 }else{
-f.innerHTML=`<div class="fd"><label>Nombre completo</label><input id="rN" placeholder="Tu nombre" autofocus></div>
-<div class="fd"><label>Correo electrónico</label><input id="rM" type="email" placeholder="tu@correo.com"></div>
-<div class="fd"><label>Número de teléfono</label><input id="rT" placeholder="+595 981 000000" oninput="fT(this)"></div>
-<div class="fd"><label>Contraseña</label><input id="rP" type="password" placeholder="Mínimo 4 caracteres"></div>
+f.innerHTML=`<div class="fd"><label>Nombre completo <span style="color:var(--red)">*</span></label><input id="rN" placeholder="Tu nombre" autofocus></div>
+<div class="fd"><label>Correo electrónico <span style="color:var(--red)">*</span></label><input id="rM" type="email" placeholder="tu@correo.com"></div>
+<div class="fd"><label>Contraseña <span style="color:var(--red)">*</span></label><input id="rP" type="password" placeholder="Mínimo 4 caracteres"></div>
+<div class="fd"><label>Confirmar contraseña <span style="color:var(--red)">*</span></label><input id="rP2" type="password" placeholder="Repetir contraseña"></div>
 <button class="btn bo" onclick="dR()" style="width:100%;justify-content:center;margin-top:6px">Crear cuenta</button>
 ${S.usuarios.length===0?'<div style="font-size:12px;color:var(--green);text-align:center;margin-top:14px">Este primer usuario será administrador.</div>':''}`;
 document.getElementById('aTit').innerHTML='Crear <em>cuenta nueva</em>';
@@ -926,14 +928,16 @@ document.getElementById('aSub').textContent='Completá los datos para registrart
 function dR(){
 const n=document.getElementById('rN').value.trim();
 const m=document.getElementById('rM').value.trim();
-const t=document.getElementById('rT').value.trim();
 const p=document.getElementById('rP').value;
-if(!n||!m||!t||!p){tst('Completá todos los campos');return}
+const p2=document.getElementById('rP2').value;
+const missing=[];if(!n)missing.push('Nombre');if(!m)missing.push('Correo');if(!p)missing.push('Contraseña');if(!p2)missing.push('Confirmación');
+if(missing.length){tst('Falta completar: '+missing.join(', ')+' *');return}
 if(p.length<4){tst('Contraseña muy corta');return}
+if(p!==p2){tst('Las contraseñas no coinciden');return}
 if(!/^[^@]+@[^@]+\.[^@]+$/.test(m)){tst('Correo inválido');return}
 if(S.usuarios.some(u=>u.correo.toLowerCase()===m.toLowerCase())){tst('Ya existe ese correo');return}
 const prm={};const e0=S.usuarios.length===0;PERMS.forEach(x=>prm[x]=e0);
-const u={id:uid(),nombre:n,correo:m,telefono:t,passHash:hs(p),rol:e0?'admin':'',permisos:prm,creado:nI(),activo:true};
+const u={id:uid(),nombre:n,correo:m,telefono:'',passHash:hs(p),rol:e0?'admin':'',permisos:prm,creado:nI(),activo:true};
 S.usuarios.unshift(u);S.sesion.uid=u.id;log('Creó','Usuario',n+(e0?' (primer administrador)':' (registro)'),null,{nombre:n,correo:m,rol:e0?'admin':'sin rol'});sv();tst(e0?'¡Cuenta creada · sos administrador!':'Cuenta creada');iniA();
 }
 function dL(){
@@ -1170,9 +1174,8 @@ if(!nv)aN(c.tipo==='proveedor'?'or':'wa',(c.tipo==='proveedor'?'Proveedor — ':
 log('Mensaje','Conversación','Mensaje recibido de '+c.contactoNombre,null,{de:c.contactoNombre,texto:(tx||'(archivo)').slice(0,80)});sv();if(document.getElementById('v-wazzup').classList.contains('on')){rCv();if(S.ui.wzAc===c.id)rAC()}rSP();rLd();rD();rEst();rProv();
 return c;
 }
-function enviar(cId,tx,at,opts){opts=opts||{};const c=S.conversaciones.find(x=>x.id===cId);if(!c)return;if(!(tx||'').trim()&&!at)return;const vd=(isAdminView()&&S.ui.wzV!=='__all__'&&S.ui.wzV!=='__none__')?S.ui.wzV:c.vendedorId;c.mensajes.push({id:uid(),de:'vendedor',texto:(tx||'').trim(),ts:nI(),hora:nT(),vendedorId:vd,attachment:storeAtt(at),auto:!!opts.auto});c.ultimaActividad=nI();
-if(!opts.auto){log('Mensaje','Conversación','Respuesta a '+c.contactoNombre,null,{de:'vendedor',texto:(tx||'(archivo)').slice(0,80)})}if(!opts.auto&&!c.respondida){c.respondida=true;if(c.leadId){const l=S.leads.find(x=>x.id===c.leadId);if(l&&l.et==='Nuevo'){l.et='Respondido';log('Cambió estado','Lead',l.n+' (auto por respuesta)',{etapa:'Nuevo'},{etapa:'Respondido'})}}}
-S.conversaciones=[c,...S.conversaciones.filter(x=>x.id!==c.id)];sv();rCv();rAC();rLd();rD();rEst()}
+function enviar(cId,tx,at,opts){opts=opts||{};const c=S.conversaciones.find(x=>x.id===cId);if(!c)return;if(!(tx||'').trim()&&!at)return;const vd=(isAdminView()&&S.ui.wzV!=='__all__'&&S.ui.wzV!=='__none__')?S.ui.wzV:c.vendedorId;const att=storeAtt(at);const m={id:uid(),de:'vendedor',texto:(tx||'').trim(),ts:nI(),hora:nT(),vendedorId:vd,attachment:att,auto:!!opts.auto};c.mensajes.push(m);c.ultimaActividad=nI();if(!opts.auto){log('Mensaje','Conversación','Respuesta a '+c.contactoNombre,null,{de:'vendedor',texto:(tx||'(archivo)').slice(0,80)})}if(!opts.auto&&!c.respondida){c.respondida=true;if(c.leadId){const l=S.leads.find(x=>x.id===c.leadId);if(l&&l.et==='Nuevo'){l.et='Respondido';log('Cambió estado','Lead',l.n+' (auto por respuesta)',{etapa:'Nuevo'},{etapa:'Respondido'})}}}S.conversaciones=[c,...S.conversaciones.filter(x=>x.id!==c.id)];sv();rCv();rAC();rLd();rD();rEst();if(att&&att.attId&&_dbReady){uploadAttToStorage(cId,att.attId).catch(e=>console.warn('Upload fail:',e))}}
+
 function rSP(){const t=S.conversaciones.reduce((s,c)=>s+(c.sinLeer||0),0);const p=document.getElementById('pWz');p.textContent=t||S.conversaciones.length;p.classList.toggle('on',S.conversaciones.length>0)}
 function mCR(){const id=S.ui.wzAc;if(!id)return;const c=S.conversaciones.find(x=>x.id===id);if(c&&c.sinLeer){c.sinLeer=0;sv();rCv();rSP()}}
 function rWS(){const adm=isAdminView();const s=document.getElementById('wVV');const c=S.ui.wzV||'__all__';s.innerHTML='<option value="__all__">Ver: Admin (todas)</option>'+vAct().map(v=>`<option value="${v.id}">Ver como: ${esc(v.nombre)}</option>`).join('')+'<option value="__none__">Sin asignar</option>';s.value=c;s.style.display=adm?'':'none';const cfg=document.getElementById('wCfgBtn');if(cfg)cfg.style.display=adm?'':'none';
