@@ -827,9 +827,41 @@ let _rtCh=[],_renderT=null,_applyingRemote=false;
 function scheduleRender(){clearTimeout(_renderT);_renderT=setTimeout(()=>{try{rA()}catch{}},120)}
 function applyRemote(k,ev,row,old){const m=DB_MAP[k];_applyingRemote=true;try{if(ev==='DELETE'){const id=(old&&old.id)||(row&&row.id);if(id)S[k]=(S[k]||[]).filter(x=>x.id!==id)}else{const obj=m.in(row);if(!S[k])S[k]=[];const idx=S[k].findIndex(x=>x.id===obj.id);if(idx>=0)S[k][idx]=obj;else S[k].unshift(obj)}try{localStorage.setItem(LS,JSON.stringify(S))}catch{}if(_lastSnap[k]){if(ev==='DELETE'){const id=(old&&old.id)||(row&&row.id);if(id)_lastSnap[k].delete(id)}else _lastSnap[k].add(row.id)}}finally{_applyingRemote=false}scheduleRender()}
 function applyRemoteConfig(row){_applyingRemote=true;try{S.config={miWa:row.mi_wa||'',autoLead:row.auto_lead!==false,dist:row.distribucion||'aleatoria',apiKey:row.api_key||'',apiProv:row.api_prov||'',apiOn:!!row.api_on};try{localStorage.setItem(LS,JSON.stringify(S))}catch{}}finally{_applyingRemote=false}scheduleRender()}
-function dbSubscribe(){if(!SB)return;_rtCh.forEach(c=>{try{SB.removeChannel(c)}catch{}});_rtCh=[];
- for(const k of Object.keys(DB_MAP)){const m=DB_MAP[k];const ch=SB.channel('rt:'+m.tb).on('postgres_changes',{event:'*',schema:'public',table:m.tb},pl=>{if(_syncing)return;applyRemote(k,pl.eventType,pl.new||{},pl.old||{})}).subscribe();_rtCh.push(ch)}
- const cc=SB.channel('rt:configuracion').on('postgres_changes',{event:'*',schema:'public',table:'configuracion'},pl=>{if(_syncing||!pl.new)return;applyRemoteConfig(pl.new)}).subscribe();_rtCh.push(cc)}
+function dbSubscribe(){if(!SB){console.warn('❌ SB no inicializado');return}
+ _rtCh.forEach(c=>{try{c.unsubscribe()}catch{}});_rtCh=[];
+ console.log('🔄 Inicializando Realtime subscriptions...');
+ const handler=(k,ev,row,old)=>{
+  const m=DB_MAP[k];console.log('📨 RT event:',k,ev,row?.id||old?.id);
+  if(_syncing){console.log('⏸️ Sync en progreso, ignorando');return}
+  applyRemote(k,ev,row||{},old||{})
+ };
+ const cfgHandler=(row)=>{
+  console.log('📨 Config update');
+  if(_syncing){console.log('⏸️ Sync en progreso');return}
+  applyRemoteConfig(row)
+ };
+ for(const k of Object.keys(DB_MAP)){
+  const m=DB_MAP[k];
+  const sub=SB
+   .channel('public:'+m.tb)
+   .on('postgres_changes',{event:'INSERT',schema:'public',table:m.tb},(pl)=>{handler(k,'INSERT',pl.new,null)})
+   .on('postgres_changes',{event:'UPDATE',schema:'public',table:m.tb},(pl)=>{handler(k,'UPDATE',pl.new,pl.old)})
+   .on('postgres_changes',{event:'DELETE',schema:'public',table:m.tb},(pl)=>{handler(k,'DELETE',pl.old,pl.old)})
+   .subscribe((status)=>{
+    if(status==='SUBSCRIBED')console.log('✅ Realtime:',m.tb);
+    else if(status==='CLOSED')console.warn('⚠️ Realtime closed:',m.tb);
+   });
+  _rtCh.push(sub);
+ }
+ const cfgSub=SB
+  .channel('public:configuracion')
+  .on('postgres_changes',{event:'UPDATE',schema:'public',table:'configuracion'},(pl)=>{cfgHandler(pl.new)})
+  .subscribe((status)=>{
+   if(status==='SUBSCRIBED')console.log('✅ Realtime: config');
+  });
+ _rtCh.push(cfgSub);
+ console.log('✅ Realtime setup completado. Suscripciones:',_rtCh.length)
+}
 let _syncT=null,_syncing=false,_syncDirty=false;
 function dbSync(){if(!_dbReady||!SB){return}if(_syncing){_syncDirty=true;return}_syncing=true;_syncDirty=false;
  (async()=>{try{const cfg={id:'main',mi_wa:S.config.miWa||'',auto_lead:!!S.config.autoLead,distribucion:S.config.dist||'aleatoria',api_key:S.config.apiKey||'',api_prov:S.config.apiProv||'',api_on:!!S.config.apiOn};await SB.from('configuracion').upsert(cfg);
