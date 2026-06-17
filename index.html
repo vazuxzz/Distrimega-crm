@@ -771,7 +771,7 @@ const LS='dm_crm_v5';
 const PERMS=['dashboard','wazzup','leads','clientes','proveedores','oportunidades','inventario'];
 const PLBL={dashboard:'Panel principal',wazzup:'Wazzup',leads:'Leads',clientes:'Clientes',proveedores:'Proveedores',oportunidades:'Oportunidades',inventario:'Inventario'};
 const VEND_DEF_PERMS=['dashboard','wazzup','leads','clientes','proveedores','oportunidades','inventario'];
-const DEF={usuarios:[],clientes:[],leads:[],opps:[],conversaciones:[],recordatorios:[],notif:[],productos:[],proveedores:[],audit:[],config:{miWa:'',autoLead:true,dist:'aleatoria',apiKey:'',apiProv:'',apiOn:false},ui:{wzV:'__all__',wzAc:null,wzTipo:'cliente',viewAs:null,sbCol:false,preview:null},sesion:{uid:null}};
+const DEF={usuarios:[],clientes:[],leads:[],opps:[],conversaciones:[],recordatorios:[],notif:[],productos:[],proveedores:[],audit:[],config:{miWa:'',autoLead:true,dist:'aleatoria',apiKey:'distrimega-2024',serverUrl:'',apiProv:'',apiOn:false},ui:{wzV:'__all__',wzAc:null,wzTipo:'cliente',viewAs:null,sbCol:false,preview:null},sesion:{uid:null}};
 const MS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MSF=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const EOP=["Contacto inicial","Propuesta enviada","Negociación","Cierre"];
@@ -1176,13 +1176,14 @@ log('Mensaje','Conversación','Mensaje recibido de '+c.contactoNombre,null,{de:c
 return c;
 }
 function enviar(cId,tx,at,opts){opts=opts||{};const c=S.conversaciones.find(x=>x.id===cId);if(!c)return;if(!(tx||'').trim()&&!at)return;const vd=(isAdminView()&&S.ui.wzV!=='__all__'&&S.ui.wzV!=='__none__')?S.ui.wzV:c.vendedorId;c.mensajes.push({id:uid(),de:'vendedor',texto:(tx||'').trim(),ts:nI(),hora:nT(),vendedorId:vd,attachment:storeAtt(at),auto:!!opts.auto});c.ultimaActividad=nI();
+if(!opts.auto&&_waOn&&(S.config.serverUrl||'').trim()){const _url=S.config.serverUrl.trim();const _at=at?{type:at.type,name:at.name,size:at.size,mime:at.mime,data:at.data}:null;fetch(_url+'/api/send',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':S.config.apiKey||''},body:JSON.stringify({to:c.telefono,text:(tx||'').trim(),attachment:_at})}).catch(e=>console.warn('WA send:',e));}
 if(!opts.auto){log('Mensaje','Conversación','Respuesta a '+c.contactoNombre,null,{de:'vendedor',texto:(tx||'(archivo)').slice(0,80)})}if(!opts.auto&&!c.respondida){c.respondida=true;if(c.leadId){const l=S.leads.find(x=>x.id===c.leadId);if(l&&l.et==='Nuevo'){l.et='Respondido';log('Cambió estado','Lead',l.n+' (auto por respuesta)',{etapa:'Nuevo'},{etapa:'Respondido'})}}}
 S.conversaciones=[c,...S.conversaciones.filter(x=>x.id!==c.id)];sv();rCv();rAC();rLd();rD();rEst()}
 function rSP(){const t=S.conversaciones.reduce((s,c)=>s+(c.sinLeer||0),0);const p=document.getElementById('pWz');p.textContent=t||S.conversaciones.length;p.classList.toggle('on',S.conversaciones.length>0)}
 function mCR(){const id=S.ui.wzAc;if(!id)return;const c=S.conversaciones.find(x=>x.id===id);if(c&&c.sinLeer){c.sinLeer=0;sv();rCv();rSP()}}
 function rWS(){const adm=isAdminView();const s=document.getElementById('wVV');const c=S.ui.wzV||'__all__';s.innerHTML='<option value="__all__">Ver: Admin (todas)</option>'+vAct().map(v=>`<option value="${v.id}">Ver como: ${esc(v.nombre)}</option>`).join('')+'<option value="__none__">Sin asignar</option>';s.value=c;s.style.display=adm?'':'none';const cfg=document.getElementById('wCfgBtn');if(cfg)cfg.style.display=adm?'':'none';
 const tipo=S.ui.wzTipo||'cliente';const tc=document.getElementById('wtC'),tp=document.getElementById('wtP');if(tc)tc.classList.toggle('on',tipo==='cliente');if(tp)tp.classList.toggle('on',tipo==='proveedor');
-const st=document.getElementById('wSt');if(S.config.apiOn){st.classList.add('ok');st.textContent='WhatsApp conectado'}else{st.classList.remove('ok');st.textContent='Modo demo'}}
+const st=document.getElementById('wSt');if(_waOn){st.classList.add('ok');st.textContent='● '+_waPhone}else if(S.config.serverUrl){st.classList.remove('ok');st.textContent='Conectando...'}else{st.classList.remove('ok');st.textContent='Sin servidor'}}
 function setWzV(v){S.ui.wzV=v;S.ui.wzAc=null;sv();rCv();rAC()}
 function setWzTipo(t){S.ui.wzTipo=t;S.ui.wzAc=null;sv();rWS();rCv();rAC()}
 function gVC(){const tipo=S.ui.wzTipo||'cliente';const sc=scopeVid();const fv=S.ui.wzV||'__all__';const q=(document.getElementById('wSr')?.value||'').toLowerCase();return S.conversaciones.filter(c=>{if((c.tipo||'cliente')!==tipo)return false;if(sc){if(c.vendedorId!==sc)return false}else{if(fv==='__none__'){if(c.vendedorId)return false}else if(fv!=='__all__'){if(c.vendedorId!==fv)return false}}if(q)return(c.contactoNombre+' '+c.telefono).toLowerCase().includes(q);return true})}
@@ -1271,7 +1272,30 @@ document.getElementById('wCh').addEventListener('drop',e=>{
 
 /* SIMULAR / CONFIG */
 function openSim(){mCtx={type:'simular'};document.getElementById('mT').innerHTML='Simular <em>mensaje entrante</em>';document.getElementById('mS').innerHTML='Simula un WhatsApp entrante. Si es nuevo, crea un lead.';document.getElementById('mF').innerHTML=`<div class="fd"><label>Número de teléfono</label><input data-k="tel" placeholder="+595 981 000000" oninput="fT(this)"></div><div class="fd"><label>Nombre del contacto (opcional)</label><input data-k="nombre" placeholder="Nombre"></div><div class="fd"><label>Mensaje</label><textarea data-k="texto" placeholder="Hola! Necesito información..."></textarea></div>`;document.getElementById('ovl').classList.add('on')}
-function openWC(){mCtx={type:'waconfig'};document.getElementById('mT').innerHTML='Configurar <em>WhatsApp</em>';document.getElementById('mS').textContent='Conectá tu línea para recibir mensajes reales.';document.getElementById('mF').innerHTML=`<div class="wcc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2"/><line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" stroke-width="2"/></svg></div><div>Por ahora estás en <strong style="color:#fff">modo demo</strong>. Guardá tus credenciales — cuando contratés un proveedor el sistema ya estará listo.</div></div><div class="fd"><label>Mi número de WhatsApp Business</label><input data-k="miWa" value="${esc(S.config.miWa)}" placeholder="+595 981 000000" oninput="fT(this)"></div><div class="fd"><label>Proveedor</label><select data-k="apiProv"><option value="" ${!S.config.apiProv?'selected':''}>— Ninguno —</option><option ${S.config.apiProv==='Meta Cloud API'?'selected':''}>Meta Cloud API</option><option ${S.config.apiProv==='Twilio'?'selected':''}>Twilio</option><option ${S.config.apiProv==='360Dialog'?'selected':''}>360Dialog</option><option ${S.config.apiProv==='Otro'?'selected':''}>Otro</option></select></div><div class="fd"><label>API Key / Token</label><input data-k="apiKey" type="password" value="${esc(S.config.apiKey)}" placeholder="Credencial"></div><div class="fd"><label>Distribución de mensajes</label><select data-k="dist"><option value="aleatoria" ${S.config.dist==='aleatoria'?'selected':''}>Aleatoria</option><option value="equitativa" ${S.config.dist==='equitativa'?'selected':''}>Equitativa</option></select></div><div class="fd"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--txt2);font-size:13px"><input type="checkbox" data-k="autoLead" ${S.config.autoLead?'checked':''} style="width:auto;accent-color:var(--orange)"> Crear lead automáticamente con cada nuevo número</label></div>`;document.getElementById('ovl').classList.add('on')}
+function openWC(){
+  mCtx={type:'waconfig'};
+  const qrArea=_wsQr&&!_waOn
+    ?`<div style="text-align:center;padding:12px 0 6px"><img src="${_wsQr}" style="width:210px;height:210px;border-radius:14px;border:3px solid var(--wa)"><p style="font-size:11px;color:var(--txt3);margin-top:8px">Abrí WhatsApp → <strong style="color:#fff">Dispositivos vinculados</strong> → Vincular dispositivo</p></div>`
+    :_waOn
+    ?`<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.35);border-radius:12px;margin-bottom:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="var(--wa)"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5-.1-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.5 1.3 5L2 22l5.2-1.4c1.4.8 3.1 1.3 4.8 1.3 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg><div><div style="color:#fff;font-weight:500;font-size:13px">Conectado · ${esc(_waPhone)}</div><div style="font-size:11px;color:var(--txt3)">WhatsApp Web activo</div></div></div>`
+    :`<div style="padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:12px;font-size:12px;color:var(--txt3);margin-bottom:4px">Guardá la URL y la clave → el QR aparece acá automáticamente.</div>`;
+  document.getElementById('mT').innerHTML='Conectar <em>WhatsApp</em>';
+  document.getElementById('mS').textContent='Configurá tu servidor y escaneá el QR con tu teléfono.';
+  document.getElementById('mF').innerHTML=`${qrArea}
+<div class="fd"><label>URL del servidor</label><input data-k="serverUrl" value="${esc(S.config.serverUrl||'')}" placeholder="http://localhost:3001"></div>
+<div class="fd"><label>API Key del servidor</label><input data-k="apiKey" type="password" value="${esc(S.config.apiKey||'')}" placeholder="distrimega-2024"></div>
+<div class="fd"><label>Distribución de mensajes</label><select data-k="dist"><option value="aleatoria" ${S.config.dist==='aleatoria'?'selected':''}>Aleatoria</option><option value="equitativa" ${S.config.dist==='equitativa'?'selected':''}>Equitativa</option></select></div>
+<div class="fd"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--txt2);font-size:13px"><input type="checkbox" data-k="autoLead" ${S.config.autoLead?'checked':''} style="width:auto;accent-color:var(--orange)"> Crear lead automáticamente con cada número nuevo</label></div>
+${_waOn?`<button type="button" style="width:100%;padding:10px;margin-top:4px;background:rgba(255,92,92,.1);border:1px solid rgba(255,92,92,.3);border-radius:12px;color:var(--red);cursor:pointer;font-family:inherit;font-size:13px" onclick="logoutWA()">Desvincular WhatsApp</button>`:''}`;
+  document.getElementById('ovl').classList.add('on');
+}
+function logoutWA(){
+  const url=(S.config.serverUrl||'').trim();
+  if(url) fetch(url+'/api/logout',{method:'POST',headers:{'x-api-key':S.config.apiKey||''}}).catch(()=>{});
+  _waOn=false;_waPhone='';_wsQr=null;
+  if(_ws){try{_ws.close()}catch{}_ws=null}
+  rWS();cM();tst('WhatsApp desvinculado');
+}
 
 /* EXCEL */
 function exp(tp){let d=[],fn='';if(tp==='clientes'){fn='clientes_distrimega.xlsx';d=S.clientes.map(c=>{const t=(c.ventas||[]).reduce((s,v)=>s+v.monto,0);return{Cliente:c.n,Teléfono:c.tel||'',Ciudad:c.ciu||'',Origen:c.origen||'',Vendedor:vN(c.vendedorId),'Cant. ventas':(c.ventas||[]).length,'Total (Gs)':t,'Fecha registro':c.creado?new Date(c.creado).toLocaleDateString('es-PY'):''}})}else if(tp==='leads'){fn='leads_distrimega.xlsx';d=S.leads.map(l=>({Lead:l.n,Contacto:l.c||'',Teléfono:l.tel||'',Origen:l.origenWazzup?'Wazzup':(l.org||''),Vendedor:vN(l.vendedorId),Etapa:l.et||'',Fecha:l.creado?new Date(l.creado).toLocaleDateString('es-PY'):''}))}else if(tp==='oportunidades'){fn='oportunidades_distrimega.xlsx';d=S.opps.map(o=>({Título:o.t,Cliente:o.c||'',Vendedor:vN(o.vendedorId),'Monto (Gs)':o.m||0,Etapa:EOP[o.e]||'','Fecha seguimiento':o.fechaSeguimiento||'',Fecha:o.creado?new Date(o.creado).toLocaleDateString('es-PY'):''}))}else if(tp==='historial'){fn='historial_distrimega.xlsx';d=(S.audit||[]).map(a=>{const dt=new Date(a.ts);const fmt=o=>o?Object.keys(o).map(k=>k+': '+(o[k]==null?'':o[k])).join(' | '):'';return{'Fecha y hora':dt.toLocaleString('es-PY'),Usuario:a.userName,Rol:a.userRol||'',Acción:a.accion,Elemento:a.entidad,Detalle:a.detalle||'',Antes:fmt(a.antes),Después:fmt(a.despues)}})}if(!d.length){tst('Sin datos');return}const ws=XLSX.utils.json_to_sheet(d);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,tp);XLSX.writeFile(wb,fn);tst('Exportado')}
@@ -1327,7 +1351,7 @@ if(type==='lead2cli'){const l=S.leads.find(x=>x.id===mCtx.lid);const{items,total
 if(type==='lead2opp'){const l=S.leads.find(x=>x.id===mCtx.lid);if(!d.t){tst('Ingresá un título');return}const op={id:uid(),t:d.t,c:l.n,m:pN(d.m),e:parseInt(d.e)||0,vendedorId:l.vendedorId||'',fechaSeguimiento:d.fs||'',creado:nI()};S.opps.unshift(op);if(d.fs){S.recordatorios.push({id:uid(),t:'Retomar contacto con '+l.n,cliente:d.t,fecha:d.fs,oppId:op.id,hecho:false});aN('b','Seguimiento programado','Retomar a '+l.n+' el '+new Date(d.fs+'T00:00').toLocaleDateString('es-PY'))}if(l.conversacionId){const c=S.conversaciones.find(x=>x.id===l.conversacionId);if(c)c.leadId=null}S.leads=S.leads.filter(x=>x.id!==l.id);log('Convirtió','Oportunidad',l.n+' (lead → oportunidad): '+d.t,{tipo:'Lead'},{tipo:'Oportunidad',titulo:d.t,monto:fGF(pN(d.m))});sv();rA();cM();tst('Pasado a oportunidad');go('oportunidades');return}
 if(type==='opp2vt'){const o=S.opps.find(x=>x.id===mCtx.oid);const{items,total,desc}=gPD();if(!items.length){tst('Cargá productos');return}let c=S.clientes.find(x=>x.n.toLowerCase()===String(o.c).toLowerCase());if(!c){c={id:uid(),n:o.c||'Sin nombre',tel:d.tel||'',ciu:d.ciu||'',origen:'Contacto',vendedorId:o.vendedorId||'',creado:nI(),ventas:[]};S.clientes.unshift(c);log('Creó','Cliente',c.n+' (desde cierre de venta)',null,{nombre:c.n,origen:c.origen,vendedor:vN(c.vendedorId)})}c.ventas=c.ventas||[];c.ventas.push({desc,monto:total,fecha:d.fecha||tI(),productos:items});S.opps=S.opps.filter(x=>x.id!==o.id);S.recordatorios=S.recordatorios.filter(r=>r.oppId!==o.id);aN('g','Venta cerrada — '+c.n,desc+' · '+fGF(total));log('Cambió estado','Oportunidad',o.t+' → GANADA',{etapa:EOP[o.e]||''},{etapa:'Ganada (venta cerrada)'});log('Creó','Venta',c.n+' · '+desc,null,{cliente:c.n,total:fGF(total),productos:items.length});sv();rA();cM();tst('Venta cerrada');go('clientes');return}
 if(type==='simular'){if(!d.tel||!d.texto){tst('Ingresá teléfono y mensaje');return}const c=recibirMensaje(d.tel,d.nombre,d.texto);cM();tst('Mensaje recibido');if(c){go('wazzup');S.ui.wzAc=c.id;sv();setTimeout(()=>rAC(),50)}return}
-if(type==='waconfig'){const antes={proveedor:S.config.apiProv||'—',distribucion:S.config.dist,autoLead:S.config.autoLead?'sí':'no'};Object.assign(S.config,{miWa:d.miWa||'',apiProv:d.apiProv||'',apiKey:d.apiKey||'',dist:d.dist||'aleatoria',autoLead:!!d.autoLead});S.config.apiOn=!!(S.config.miWa&&S.config.apiKey&&S.config.apiProv);log('Configuró','Configuración','WhatsApp / distribución',antes,{proveedor:S.config.apiProv||'—',distribucion:S.config.dist,autoLead:S.config.autoLead?'sí':'no'});sv();cM();rWS();tst('Configuración guardada');return}
+if(type==='waconfig'){const antes={serverUrl:S.config.serverUrl||'—',distribucion:S.config.dist,autoLead:S.config.autoLead?'sí':'no'};const urlChanged=d.serverUrl!==S.config.serverUrl||d.apiKey!==S.config.apiKey;Object.assign(S.config,{serverUrl:d.serverUrl||'',apiKey:d.apiKey||'distrimega-2024',dist:d.dist||'aleatoria',autoLead:!!d.autoLead});log('Configuró','Configuración','Servidor WhatsApp',antes,{serverUrl:S.config.serverUrl||'—',distribucion:S.config.dist,autoLead:S.config.autoLead?'sí':'no'});sv();cM();rWS();if(urlChanged){if(_ws){try{_ws.close()}catch{}_ws=null}_waOn=false;_waPhone='';_wsQr=null;initWS()}tst('Configuración guardada');return}
 if(type==='usuario'){if(!d.nombre||!d.correo||!d.telefono){tst('Completá los campos básicos');return}if(!/^[^@]+@[^@]+\.[^@]+$/.test(d.correo)){tst('Correo inválido');return}if(!id&&!d.pass){tst('Ingresá contraseña');return}if(id){const u=S.usuarios.find(x=>x.id===id);const antes={nombre:u.nombre,correo:u.correo,telefono:u.telefono,rol:u.rol||'sin rol'};u.nombre=d.nombre;u.correo=d.correo;u.telefono=d.telefono;if(d.pass){if(d.pass.length<4){tst('Contraseña corta');return}u.passHash=hs(d.pass)}if(d.rol!==u.rol){u.rol=d.rol;if(d.rol==='admin'){if(!u.permisos)u.permisos={};PERMS.forEach(p=>u.permisos[p]=true)}}log('Editó','Usuario',u.nombre,antes,{nombre:u.nombre,correo:u.correo,telefono:u.telefono,rol:u.rol||'sin rol'})}else{if(d.pass.length<4){tst('Contraseña corta');return}if(S.usuarios.some(u=>u.correo.toLowerCase()===d.correo.toLowerCase())){tst('Correo ya registrado');return}const prm={};PERMS.forEach(p=>prm[p]=d.rol==='admin');S.usuarios.unshift({id:uid(),nombre:d.nombre,correo:d.correo,telefono:d.telefono,passHash:hs(d.pass),rol:d.rol||'',permisos:prm,bienvenida:{activo:false,texto:''},creado:nI(),activo:true});log('Creó','Usuario',d.nombre,null,{nombre:d.nombre,correo:d.correo,rol:d.rol||'sin rol'})}sv();rA();cM();tst(id?'Actualizado':'Registrado');return}
 if(type==='asignarAdmin'){if(!d.userId){tst('Elegí un usuario');return}const u=S.usuarios.find(x=>x.id===d.userId);if(u){const antes=u.rol||'sin rol';u.rol='admin';if(!u.permisos)u.permisos={};PERMS.forEach(p=>u.permisos[p]=true);log('Asignó','Usuario',u.nombre+' → Administrador',{rol:antes},{rol:'admin'});sv();rA();cM();tst('Administrador asignado')}return}
 if(type==='asignarVend'){if(!d.userId){tst('Elegí un usuario');return}const u=S.usuarios.find(x=>x.id===d.userId);if(u){const antes=u.rol||'sin rol';u.rol='vendedor';if(!u.permisos)u.permisos={};VEND_DEF_PERMS.forEach(p=>u.permisos[p]=true);PERMS.forEach(p=>{if(!(p in u.permisos))u.permisos[p]=false});log('Asignó','Usuario',u.nombre+' → Vendedor',{rol:antes},{rol:'vendedor'});sv();rA();cM();tst('Vendedor asignado · configurá sus permisos')}return}
@@ -1429,6 +1453,48 @@ h+='</tbody></table></div>';w.innerHTML=h}
 function rA(){rVF();rRg();rAd();rVn();rCli();rLd();rOp();rD();rN();rSP();rWS();rCv();rAC();rInv();rProv();rEst();rMsg();rAdm();rAud();rBienv();updBvDot();applyNav()}
 
 bootstrap();
+
+/* ── WHATSAPP WEBSOCKET CLIENT ─────────────────────────── */
+let _ws=null,_waOn=false,_waPhone='',_wsQr=null,_wsRetry=null;
+
+function initWS(){
+  clearTimeout(_wsRetry);
+  const url=(S.config.serverUrl||'').trim();
+  if(!url||_ws)return;
+  const wsUrl=url.replace(/^https/,'wss').replace(/^http/,'ws');
+  try{
+    _ws=new WebSocket(wsUrl);
+    _ws.onopen=()=>{clearTimeout(_wsRetry);rWS()};
+    _ws.onclose=()=>{
+      _ws=null;
+      if(!_waOn)rWS();
+      _wsRetry=setTimeout(initWS,6000);
+    };
+    _ws.onerror=()=>{};
+    _ws.onmessage=(e)=>{
+      let d;try{d=JSON.parse(e.data)}catch{return}
+      if(d.type==='pong')return;
+      if(d.type==='qr'){
+        _wsQr=d.qr;_waOn=false;rWS();
+        if(document.getElementById('ovl').classList.contains('on')&&mCtx?.type==='waconfig')openWC();
+      }
+      if(d.type==='connected'){
+        _waOn=true;_waPhone=d.phone||'';_wsQr=null;rWS();tst('WhatsApp conectado ✓');
+        if(document.getElementById('ovl').classList.contains('on')&&mCtx?.type==='waconfig')openWC();
+      }
+      if(d.type==='disconnected'){
+        _waOn=false;_waPhone='';rWS();
+        if(d.logout){_wsQr=null;tst('WhatsApp desvinculado')}
+      }
+      if(d.type==='message'&&!d.fromMe){
+        const at=d.attachment?{type:d.attachment.type,name:d.attachment.name,size:d.attachment.size,mime:d.attachment.mime,data:d.attachment.data}:null;
+        recibirMensaje(d.from,d.name||null,d.text||'',at);
+      }
+    };
+  }catch(e){_ws=null;_wsRetry=setTimeout(initWS,6000)}
+}
+
+setTimeout(initWS,800);
 </script>
 </body>
 </html>
