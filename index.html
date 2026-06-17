@@ -309,6 +309,10 @@ select option{background:#1a1a1e}
 .pa img{width:36px;height:36px;border-radius:8px;object-fit:cover}
 .pa .x{margin-left:auto;background:none;border:none;color:var(--txt3);cursor:pointer;font-size:18px;padding:4px 8px}
 .wec{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center}
+.wzdrop{position:absolute;inset:0;background:rgba(37,211,102,.12);border:3px dashed var(--wa);border-radius:0;display:none;align-items:center;justify-content:center;z-index:40;pointer-events:none;flex-direction:column;gap:12px}
+.wzdrop.on{display:flex}
+.wzdrop svg{width:48px;height:48px;stroke:var(--wa);fill:none;opacity:.9}
+.wzdrop span{font-size:15px;font-weight:600;color:var(--wa)}
 .wec .ic{width:80px;height:80px;border-radius:50%;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
 .wec .ic svg{width:36px;height:36px;fill:var(--wa)}
 .wec .t{color:#fff;font-size:16px;font-weight:500;margin-bottom:6px}
@@ -569,7 +573,7 @@ select option{background:#1a1a1e}
 <button class="btn bg sm" id="wCfgBtn" onclick="openWC()"><svg viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Configurar</button>
 <button class="btn bw sm" onclick="openSim()"><svg viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>Simular</button>
 </div></div>
-<div class="wzb" id="wB"><div class="wzl"><div class="fb"><input id="wSr" placeholder="Buscar conversación…" oninput="rCv()" style="width:100%;background:var(--panel);border:1px solid var(--border);color:#fff;border-radius:99px;padding:8px 14px;font-size:13px;outline:none"></div><div class="wzcl" id="wCL"></div></div><div class="wzc" id="wCh"></div></div>
+<div class="wzb" id="wB"><div class="wzl"><div class="fb"><input id="wSr" placeholder="Buscar conversación…" oninput="rCv()" style="width:100%;background:var(--panel);border:1px solid var(--border);color:#fff;border-radius:99px;padding:8px 14px;font-size:13px;outline:none"></div><div class="wzcl" id="wCL"></div></div><div class="wzc" id="wCh" style="position:relative"></div></div>
 </div></section>
 
 <!-- CLIENTES -->
@@ -867,7 +871,7 @@ function dbSync(){if(!_dbReady||!SB){return}if(_syncing){_syncDirty=true;return}
  (async()=>{try{const cfg={id:'main',mi_wa:S.config.miWa||'',auto_lead:!!S.config.autoLead,distribucion:S.config.dist||'aleatoria',api_key:S.config.apiKey||'',api_prov:S.config.apiProv||'',api_on:!!S.config.apiOn};await SB.from('configuracion').upsert(cfg);
   for(const k of Object.keys(DB_MAP)){const m=DB_MAP[k];const arr=S[k]||[];const cur=new Set(arr.map(x=>x.id));const prev=_lastSnap[k]||new Set();const toDel=[...prev].filter(id=>!cur.has(id));if(toDel.length){await SB.from(m.tb).delete().in('id',toDel)}if(arr.length){const rows=arr.map(m.out);for(let i=0;i<rows.length;i+=500){await SB.from(m.tb).upsert(rows.slice(i,i+500),{onConflict:'id'})}}_lastSnap[k]=cur}}catch(e){console.warn('dbSync err:',e)}_syncing=false;if(_syncDirty)setTimeout(dbSync,200)})()}
 function load(){try{const r=localStorage.getItem(LS);if(!r)return JSON.parse(JSON.stringify(DEF));const p=JSON.parse(r);for(const k in DEF)if(!(k in p))p[k]=JSON.parse(JSON.stringify(DEF[k]));return p}catch{return JSON.parse(JSON.stringify(DEF))}}
-function sv(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){tst('No se pudo guardar: archivo demasiado grande para el almacenamiento local')}if(_dbReady&&!_applyingRemote){clearTimeout(_syncT);_syncT=setTimeout(dbSync,600)}}
+function sv(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){try{const slim={...S,audit:[],notif:(S.notif||[]).slice(0,10),conversaciones:(S.conversaciones||[]).map(c=>({...c,mensajes:(c.mensajes||[]).slice(-80)}))};localStorage.setItem(LS,JSON.stringify(slim))}catch(e2){try{const min={...S,audit:[],notif:[],conversaciones:(S.conversaciones||[]).map(c=>({...c,mensajes:(c.mensajes||[]).slice(-20)}))};localStorage.setItem(LS,JSON.stringify(min))}catch{}}}if(_dbReady&&!_applyingRemote){clearTimeout(_syncT);_syncT=setTimeout(dbSync,600)}}
 async function bootstrap(){const ok=await dbLoad();if(!ok){S=norm(load())}else{S.sesion=load().sesion||{uid:null};S.ui=load().ui||DEF.ui;for(const k in DEF)if(!(k in S))S[k]=JSON.parse(JSON.stringify(DEF[k]));S=norm(S)}const u=uA();if(u){iniA()}else{mLanding()}}
 function fG(n){if(!n)return'₲ 0';if(n>=1e9)return'₲ '+(n/1e9).toFixed(2)+' MM';if(n>=1e6)return'₲ '+(n/1e6).toFixed(1)+' M';if(n>=1e3)return'₲ '+Math.round(n/1e3)+' K';return'₲ '+n.toLocaleString('es-PY')}
 function fGF(n){return'₲ '+(n||0).toLocaleString('es-PY')}
@@ -915,8 +919,8 @@ document.getElementById('aSub').textContent='Ingresá con tu cuenta.';
 }else{
 f.innerHTML=`<div class="fd"><label>Nombre completo</label><input id="rN" placeholder="Tu nombre" autofocus></div>
 <div class="fd"><label>Correo electrónico</label><input id="rM" type="email" placeholder="tu@correo.com"></div>
-<div class="fd"><label>Número de teléfono</label><input id="rT" placeholder="+595 981 000000" oninput="fT(this)"></div>
 <div class="fd"><label>Contraseña</label><input id="rP" type="password" placeholder="Mínimo 4 caracteres"></div>
+<div class="fd"><label>Confirmar contraseña</label><input id="rP2" type="password" placeholder="Repetí la contraseña"></div>
 <button class="btn bo" onclick="dR()" style="width:100%;justify-content:center;margin-top:6px">Crear cuenta</button>
 ${S.usuarios.length===0?'<div style="font-size:12px;color:var(--green);text-align:center;margin-top:14px">Este primer usuario será administrador.</div>':''}`;
 document.getElementById('aTit').innerHTML='Crear <em>cuenta nueva</em>';
@@ -926,14 +930,15 @@ document.getElementById('aSub').textContent='Completá los datos para registrart
 function dR(){
 const n=document.getElementById('rN').value.trim();
 const m=document.getElementById('rM').value.trim();
-const t=document.getElementById('rT').value.trim();
 const p=document.getElementById('rP').value;
-if(!n||!m||!t||!p){tst('Completá todos los campos');return}
+const p2=document.getElementById('rP2').value;
+if(!n||!m||!p||!p2){tst('Completá todos los campos');return}
 if(p.length<4){tst('Contraseña muy corta');return}
+if(p!==p2){tst('Las contraseñas no coinciden');return}
 if(!/^[^@]+@[^@]+\.[^@]+$/.test(m)){tst('Correo inválido');return}
 if(S.usuarios.some(u=>u.correo.toLowerCase()===m.toLowerCase())){tst('Ya existe ese correo');return}
 const prm={};const e0=S.usuarios.length===0;PERMS.forEach(x=>prm[x]=e0);
-const u={id:uid(),nombre:n,correo:m,telefono:t,passHash:hs(p),rol:e0?'admin':'',permisos:prm,creado:nI(),activo:true};
+const u={id:uid(),nombre:n,correo:m,telefono:'',passHash:hs(p),rol:e0?'admin':'',permisos:prm,creado:nI(),activo:true};
 S.usuarios.unshift(u);S.sesion.uid=u.id;log('Creó','Usuario',n+(e0?' (primer administrador)':' (registro)'),null,{nombre:n,correo:m,rol:e0?'admin':'sin rol'});sv();tst(e0?'¡Cuenta creada · sos administrador!':'Cuenta creada');iniA();
 }
 function dL(){
@@ -1187,7 +1192,7 @@ w.innerHTML=l.map(c=>{const lm=c.mensajes[c.mensajes.length-1];const lt=lm?(lm.d
 function slC(id){S.ui.wzAc=id;const c=S.conversaciones.find(x=>x.id===id);if(c&&c.sinLeer)c.sinLeer=0;sv();document.getElementById('wB').classList.add('sc');rCv();rAC();rSP()}
 function wB(){document.getElementById('wB').classList.remove('sc');S.ui.wzAc=null;sv();rCv();rAC()}
 let pAt=null;
-function rAC(){const w=document.getElementById('wCh');const id=S.ui.wzAc;if(!id){w.innerHTML=`<div class="wec"><div class="ic"><svg viewBox="0 0 24 24"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5-.1-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.5 1.3 5L2 22l5.2-1.4c1.4.8 3.1 1.3 4.8 1.3 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg></div><div class="t">Seleccioná una conversación</div><div class="d">Cuando entre un mensaje aparecerá acá.</div></div>`;return}
+function rAC(){const _prevIn=document.getElementById('wIn');const _savedTxt=_prevIn?_prevIn.value:'';const _hadFocus=_prevIn&&document.activeElement===_prevIn;const w=document.getElementById('wCh');const id=S.ui.wzAc;if(!id){w.innerHTML=`<div class="wec"><div class="ic"><svg viewBox="0 0 24 24"><path d="M17.5 14.4c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5-.1-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.5 1.3 5L2 22l5.2-1.4c1.4.8 3.1 1.3 4.8 1.3 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg></div><div class="t">Seleccioná una conversación</div><div class="d">Cuando entre un mensaje aparecerá acá.</div></div>`;return}
 const c=S.conversaciones.find(x=>x.id===id);if(!c)return;
 const ld=S.leads.find(l=>l.id===c.leadId);const va=c.vendedorId?vN(c.vendedorId):'Sin asignar';
 let lD='',mH='';
@@ -1199,7 +1204,8 @@ let statH;
 if(esP)statH=`<div class="stat"><span class="bd bg-or">Proveedor</span><button class="sbt gr" onclick="markCli('${c.id}')">↩ Marcar como cliente</button></div>`;
 else if(ld)statH=`<div class="stat"><span class="mn">Estado:</span><button class="sbt" onclick="uLE('${ld.id}','Respondido')">✓ Respondido</button><button class="sbt gr" onclick="lAC('${ld.id}')">→ Cliente</button><button class="sbt bl" onclick="lAO('${ld.id}')">→ Oportunidad</button><button class="sbt rd" onclick="uLE('${ld.id}','Perdido')">✕ Perdido</button><button class="sbt or" onclick="markProv('${c.id}')">⇄ Marcar proveedor</button></div>`;
 else statH=`<div class="stat"><span class="mn">Sin lead vinculado</span><button class="sbt or" onclick="markProv('${c.id}')">⇄ Marcar proveedor</button></div>`;
-w.innerHTML=`<div class="wch">
+w.innerHTML=`<div class="wzdrop" id="wzDrop"><svg viewBox="0 0 24 24" stroke-width="1.5" fill="none"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span>Soltá para adjuntar</span></div>
+<div class="wch">
 <div class="tr"><button class="bck" onclick="wB()"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button><div class="av">${ini(c.contactoNombre)}</div><div class="i"><div class="n">${esc(c.contactoNombre)}</div><div class="ph">${esc(c.telefono)} · ${esc(va)}${lE?' · '+lE:''}</div></div><div class="ax"><button class="bi" title="Reasignar" onclick="rAs('${c.id}')"><svg viewBox="0 0 24 24" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button></div></div>
 ${statH}
 </div>
@@ -1211,13 +1217,13 @@ ${pAt?`<div class="pa">${pAt.type==='image'?`<img src="${pAt.data}">`:''}<span>�
 <button class="sd" onclick="sW()"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
 </div>`;
 const ms=document.getElementById('wM');ms.scrollTop=ms.scrollHeight;
-const i=document.getElementById('wIn');if(i)i.focus();
+const i=document.getElementById('wIn');if(i){if(_savedTxt){i.value=_savedTxt;aGr(i);const l=_savedTxt.length;try{i.setSelectionRange(l,l)}catch{}}if(_hadFocus||_savedTxt)i.focus();}
 }
 function aGr(t){t.style.height='auto';t.style.height=Math.min(120,t.scrollHeight)+'px'}
 function tAM(e){e.stopPropagation();const m=document.getElementById('atM');m.classList.toggle('on')}
 document.addEventListener('click',()=>{const m=document.getElementById('atM');if(m)m.classList.remove('on')});
 function clAt(){pAt=null;rAC()}
-function sW(){const i=document.getElementById('wIn');if(!i)return;const t=i.value.trim();if(!t&&!pAt)return;enviar(S.ui.wzAc,t,pAt);pAt=null;i.value='';i.style.height='auto'}
+function sW(){const i=document.getElementById('wIn');if(!i)return;const t=i.value.trim();if(!t&&!pAt)return;i.value='';i.style.height='auto';enviar(S.ui.wzAc,t,pAt);pAt=null;}
 function rAs(cid){const vs=vAct();if(!vs.length){tst('No hay vendedores');return}const c=S.conversaciones.find(x=>x.id===cid);if(!c)return;const op=vs.map((v,i)=>`${i+1}. ${v.nombre}`).join('\n');const a=prompt('Reasignar a:\n\n'+op+'\n0. Sin asignar');if(a===null)return;if(a==='0'){c.vendedorId='';if(c.leadId){const l=S.leads.find(x=>x.id===c.leadId);if(l)l.vendedorId=''}}else{const i=parseInt(a)-1;if(i>=0&&i<vs.length){c.vendedorId=vs[i].id;if(c.leadId){const l=S.leads.find(x=>x.id===c.leadId);if(l)l.vendedorId=c.vendedorId}}}sv();rCv();rAC();rLd();tst('Reasignado')}
 function uLE(id,e){const l=S.leads.find(x=>x.id===id);if(l){const antes=l.et;l.et=e;log('Cambió estado','Lead',l.n,{etapa:antes},{etapa:e});sv();rLd();rAC();rD();rEst();tst('Estado: '+e)}}
 function markProv(cid){const c=S.conversaciones.find(x=>x.id===cid);if(!c)return;c.tipo='proveedor';if(c.leadId){S.leads=S.leads.filter(l=>l.id!==c.leadId);c.leadId=null}if(!S.proveedores.some(p=>nTel(p.tel)===nTel(c.telefono)))S.proveedores.unshift({id:uid(),nombre:c.contactoNombre,empresa:'',tel:c.telefono,vendedorId:c.vendedorId||'',creado:nI()});S.ui.wzTipo='proveedor';S.ui.wzAc=null;log('Cambió estado','Proveedor',c.contactoNombre+' (lead → proveedor)',{tipo:'Cliente/Lead'},{tipo:'Proveedor'});sv();rA();go('proveedores');tst('Movido a Proveedores')}
@@ -1228,6 +1234,40 @@ function hF(f,t){if(!f)return;if(f.size>3*1024*1024*1024){tst('Máximo 3GB');ret
 document.getElementById('fI').addEventListener('change',e=>{hF(e.target.files[0],'image');e.target.value=''});
 document.getElementById('fV').addEventListener('change',e=>{hF(e.target.files[0],'video');e.target.value=''});
 document.getElementById('fD').addEventListener('change',e=>{hF(e.target.files[0],'file');e.target.value=''});
+
+/* DRAG & DROP en el chat de Wazzup */
+let _dzCount=0;
+document.getElementById('wCh').addEventListener('dragenter',e=>{
+  e.preventDefault();e.stopPropagation();
+  if(!S.ui.wzAc)return;
+  _dzCount++;
+  document.getElementById('wzDrop').classList.add('on');
+});
+document.getElementById('wCh').addEventListener('dragover',e=>{e.preventDefault();e.stopPropagation()});
+document.getElementById('wCh').addEventListener('dragleave',e=>{
+  e.stopPropagation();
+  _dzCount--;
+  if(_dzCount<=0){_dzCount=0;document.getElementById('wzDrop').classList.remove('on')}
+});
+document.getElementById('wCh').addEventListener('drop',e=>{
+  e.preventDefault();e.stopPropagation();
+  _dzCount=0;document.getElementById('wzDrop').classList.remove('on');
+  if(!S.ui.wzAc)return;
+  const files=Array.from(e.dataTransfer.files);if(!files.length)return;
+  if(files.length===1){
+    const f=files[0];
+    const t=f.type.startsWith('image/')?'image':f.type.startsWith('video/')?'video':'file';
+    hF(f,t);
+  }else{
+    files.forEach(f=>{
+      if(f.size>3*1024*1024*1024){tst('Máximo 3GB: '+f.name);return}
+      const t=f.type.startsWith('image/')?'image':f.type.startsWith('video/')?'video':'file';
+      const r=new FileReader();
+      r.onload=ev=>{enviar(S.ui.wzAc,'',{type:t,name:f.name,size:f.size,mime:f.type,data:ev.target.result})};
+      r.readAsDataURL(f);
+    });
+  }
+});
 
 /* SIMULAR / CONFIG */
 function openSim(){mCtx={type:'simular'};document.getElementById('mT').innerHTML='Simular <em>mensaje entrante</em>';document.getElementById('mS').innerHTML='Simula un WhatsApp entrante. Si es nuevo, crea un lead.';document.getElementById('mF').innerHTML=`<div class="fd"><label>Número de teléfono</label><input data-k="tel" placeholder="+595 981 000000" oninput="fT(this)"></div><div class="fd"><label>Nombre del contacto (opcional)</label><input data-k="nombre" placeholder="Nombre"></div><div class="fd"><label>Mensaje</label><textarea data-k="texto" placeholder="Hola! Necesito información..."></textarea></div>`;document.getElementById('ovl').classList.add('on')}
