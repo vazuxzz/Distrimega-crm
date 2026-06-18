@@ -1176,8 +1176,20 @@ if(!nv)aN(c.tipo==='proveedor'?'or':'wa',(c.tipo==='proveedor'?'Proveedor — ':
 log('Mensaje','Conversación','Mensaje recibido de '+c.contactoNombre,null,{de:c.contactoNombre,texto:(tx||'(archivo)').slice(0,80)});sv();if(document.getElementById('v-wazzup').classList.contains('on')){rCv();if(S.ui.wzAc===c.id)rAC()}rSP();rLd();rD();rEst();rProv();
 return c;
 }
+// Refleja en la web los mensajes que el dueño escribe DESDE EL CELULAR
+// (mensajes propios que no salieron del CRM), para que los vendedores los vean.
+let _seenSelf=new Set();
+function recibirPropio(tel,tx,at){
+const t=nTel(tel);if(!t)return;
+let c=S.conversaciones.find(x=>x.telefono===t);
+if(!c){const esProv=S.proveedores.some(p=>nTel(p.tel)===t);const vd=pV();c={id:uid(),telefono:t,contactoNombre:t,vendedorId:vd,leadId:null,tipo:esProv?'proveedor':'cliente',respondida:true,mensajes:[],sinLeer:0,ultimaActividad:nI(),creado:nI()};S.conversaciones.unshift(c);}
+c.mensajes.push({id:uid(),de:'vendedor',texto:(tx||'').trim(),ts:nI(),hora:nT(),vendedorId:c.vendedorId,attachment:storeAtt(at),desdeCelular:true});
+c.ultimaActividad=nI();c.respondida=true;
+S.conversaciones=[c,...S.conversaciones.filter(x=>x.id!==c.id)];
+sv();if(document.getElementById('v-wazzup').classList.contains('on')){rCv();if(S.ui.wzAc===c.id)rAC()}rSP();rLd();
+}
 function enviar(cId,tx,at,opts){opts=opts||{};const c=S.conversaciones.find(x=>x.id===cId);if(!c)return;if(!(tx||'').trim()&&!at)return;const vd=(isAdminView()&&S.ui.wzV!=='__all__'&&S.ui.wzV!=='__none__')?S.ui.wzV:c.vendedorId;c.mensajes.push({id:uid(),de:'vendedor',texto:(tx||'').trim(),ts:nI(),hora:nT(),vendedorId:vd,attachment:storeAtt(at),auto:!!opts.auto});c.ultimaActividad=nI();
-if(!opts.auto&&_waOn&&(S.config.serverUrl||'').trim()){const _url=S.config.serverUrl.trim();const _at=at?{type:at.type,name:at.name,size:at.size,mime:at.mime,data:at.data}:null;fetch(_url+'/api/send',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':S.config.apiKey||'','ngrok-skip-browser-warning':'true'},body:JSON.stringify({to:c.telefono,text:(tx||'').trim(),attachment:_at})}).then(r=>r.json()).then(j=>{if(!j.ok)console.warn('WA send error:',j.error)}).catch(e=>console.warn('WA send:',e));}
+if(!opts.auto&&_waOn&&(WA_SERVER||S.config.serverUrl||'').trim()){const _url=(WA_SERVER||S.config.serverUrl).trim();const _at=at?{type:at.type,name:at.name,size:at.size,mime:at.mime,data:at.data}:null;fetch(_url+'/api/send',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':S.config.apiKey||'','ngrok-skip-browser-warning':'true'},body:JSON.stringify({to:c.telefono,text:(tx||'').trim(),attachment:_at})}).then(r=>r.json()).then(j=>{if(!j.ok)console.warn('WA send error:',j.error)}).catch(e=>console.warn('WA send:',e));}
 if(!opts.auto){log('Mensaje','Conversación','Respuesta a '+c.contactoNombre,null,{de:'vendedor',texto:(tx||'(archivo)').slice(0,80)})}if(!opts.auto&&!c.respondida){c.respondida=true;if(c.leadId){const l=S.leads.find(x=>x.id===c.leadId);if(l&&l.et==='Nuevo'){l.et='Respondido';log('Cambió estado','Lead',l.n+' (auto por respuesta)',{etapa:'Nuevo'},{etapa:'Respondido'})}}}
 S.conversaciones=[c,...S.conversaciones.filter(x=>x.id!==c.id)];sv();rCv();rAC();rLd();rD();rEst()}
 function rSP(){const t=S.conversaciones.reduce((s,c)=>s+(c.sinLeer||0),0);const p=document.getElementById('pWz');p.textContent=t||S.conversaciones.length;p.classList.toggle('on',S.conversaciones.length>0)}
@@ -1487,9 +1499,15 @@ function initWS(){
         _waOn=false;_waPhone='';rWS();
         if(d.logout){_wsQr=null;tst('WhatsApp desvinculado')}
       }
-      if(d.type==='message'&&!d.fromMe){
+      if(d.type==='message'){
         const at=d.attachment?{type:d.attachment.type,name:d.attachment.name,size:d.attachment.size,mime:d.attachment.mime,data:d.attachment.data}:null;
-        recibirMensaje(d.from,d.name||null,d.text||'',at);
+        if(!d.fromMe){
+          recibirMensaje(d.from,d.name||null,d.text||'',at);
+        }else if(!d.viaCrm){
+          if(d.id&&_seenSelf.has(d.id))return;
+          if(d.id){_seenSelf.add(d.id);if(_seenSelf.size>800)_seenSelf.delete(_seenSelf.values().next().value)}
+          recibirPropio(d.from,d.text||'',at);
+        }
       }
     };
   }catch(e){_ws=null;_wsRetry=setTimeout(initWS,6000)}
