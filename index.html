@@ -768,6 +768,7 @@ select option{background:#1a1a1e}
 
 <script>
 const LS='dm_crm_v5';
+const WA_SERVER='https://cradling-travesty-enduring.ngrok-free.dev';
 const PERMS=['dashboard','wazzup','leads','clientes','proveedores','oportunidades','inventario'];
 const PLBL={dashboard:'Panel principal',wazzup:'Wazzup',leads:'Leads',clientes:'Clientes',proveedores:'Proveedores',oportunidades:'Oportunidades',inventario:'Inventario'};
 const VEND_DEF_PERMS=['dashboard','wazzup','leads','clientes','proveedores','oportunidades','inventario'];
@@ -1183,7 +1184,7 @@ function rSP(){const t=S.conversaciones.reduce((s,c)=>s+(c.sinLeer||0),0);const 
 function mCR(){const id=S.ui.wzAc;if(!id)return;const c=S.conversaciones.find(x=>x.id===id);if(c&&c.sinLeer){c.sinLeer=0;sv();rCv();rSP()}}
 function rWS(){const adm=isAdminView();const s=document.getElementById('wVV');const c=S.ui.wzV||'__all__';s.innerHTML='<option value="__all__">Ver: Admin (todas)</option>'+vAct().map(v=>`<option value="${v.id}">Ver como: ${esc(v.nombre)}</option>`).join('')+'<option value="__none__">Sin asignar</option>';s.value=c;s.style.display=adm?'':'none';const cfg=document.getElementById('wCfgBtn');if(cfg)cfg.style.display=adm?'':'none';
 const tipo=S.ui.wzTipo||'cliente';const tc=document.getElementById('wtC'),tp=document.getElementById('wtP');if(tc)tc.classList.toggle('on',tipo==='cliente');if(tp)tp.classList.toggle('on',tipo==='proveedor');
-const st=document.getElementById('wSt');if(_waOn){st.classList.add('ok');st.textContent='● '+_waPhone}else if(S.config.serverUrl){st.classList.remove('ok');st.textContent='Conectando...'}else{st.classList.remove('ok');st.textContent='Sin servidor'}}
+const st=document.getElementById('wSt');if(_waOn){st.classList.add('ok');st.textContent='● '+_waPhone}else if(WA_SERVER||S.config.serverUrl){st.classList.remove('ok');st.textContent='Conectando...'}else{st.classList.remove('ok');st.textContent='Sin servidor'}}
 function setWzV(v){S.ui.wzV=v;S.ui.wzAc=null;sv();rCv();rAC()}
 function setWzTipo(t){S.ui.wzTipo=t;S.ui.wzAc=null;sv();rWS();rCv();rAC()}
 function gVC(){const tipo=S.ui.wzTipo||'cliente';const sc=scopeVid();const fv=S.ui.wzV||'__all__';const q=(document.getElementById('wSr')?.value||'').toLowerCase();return S.conversaciones.filter(c=>{if((c.tipo||'cliente')!==tipo)return false;if(sc){if(c.vendedorId!==sc)return false}else{if(fv==='__none__'){if(c.vendedorId)return false}else if(fv!=='__all__'){if(c.vendedorId!==fv)return false}}if(q)return(c.contactoNombre+' '+c.telefono).toLowerCase().includes(q);return true})}
@@ -1459,7 +1460,7 @@ let _ws=null,_waOn=false,_waPhone='',_wsQr=null,_wsRetry=null;
 
 function initWS(){
   clearTimeout(_wsRetry);
-  const url=(S.config.serverUrl||'').trim();
+  const url=(WA_SERVER||S.config.serverUrl||'').trim();
   if(!url||_ws)return;
   const wsUrl=url.replace(/^https/,'wss').replace(/^http/,'ws');
   try{
