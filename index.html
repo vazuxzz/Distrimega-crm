@@ -892,7 +892,7 @@ function fN(el){el.value=el.value.replace(/[^\d]/g,'')}
 function hs(s){let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0}return String(h)}
 function uA(){return S.usuarios.find(u=>u.id===S.sesion.uid)||null}
 function tP(p){const u=uA();if(!u)return false;if(u.rol==='admin'||u.rol==='owner')return true;if(p==='*')return true;return u.permisos&&u.permisos[p]===true}
-function pv(){const u=uA();if(!u)return{role:'',vid:null,name:''};if(u.rol==='owner'){const va=S.ui.viewAs;if(va&&va!=='admin'){if(va==='sinrol')return{role:'sinrol',vid:null,name:'usuario sin rol',isPreview:true,perms:{}};const v=S.usuarios.find(x=>x.id===va&&x.rol==='vendedor');if(v)return{role:'vendedor',vid:v.id,name:v.nombre,isPreview:true,perms:v.permisos||{}}}return{role:'owner',vid:null,name:u.nombre,perms:null}}if(u.rol==='admin')return{role:'admin',vid:null,name:u.nombre,perms:null};if(u.rol==='vendedor')return{role:'vendedor',vid:u.id,name:u.nombre,perms:u.permisos||{}};return{role:'sinrol',vid:null,name:u.nombre,perms:{}}}
+function pv(){const u=uA();if(!u)return{role:'',vid:null,name:''};if(u.rol==='owner'){const va=S.ui.viewAs;if(va&&va!=='admin'){if(va==='sinrol')return{role:'sinrol',vid:null,name:'usuario sin rol',isPreview:true,perms:{}};if(va==='roladmin')return{role:'admin',vid:null,name:'administrador',isPreview:true,perms:null};const v=S.usuarios.find(x=>x.id===va&&x.rol==='vendedor');if(v)return{role:'vendedor',vid:v.id,name:v.nombre,isPreview:true,perms:v.permisos||{}};const a=S.usuarios.find(x=>x.id===va&&x.rol==='admin');if(a)return{role:'admin',vid:null,name:a.nombre,isPreview:true,perms:null}}return{role:'owner',vid:null,name:u.nombre,perms:null}}if(u.rol==='admin')return{role:'admin',vid:null,name:u.nombre,perms:null};if(u.rol==='vendedor')return{role:'vendedor',vid:u.id,name:u.nombre,perms:u.permisos||{}};return{role:'sinrol',vid:null,name:u.nombre,perms:{}}}
 function scopeVid(){const p=pv();return p.role==='vendedor'?p.vid:null}
 function isAdminView(){const r=pv().role;return r==='admin'||r==='owner'}
 function isOwner(){const u=uA();return!!u&&u.rol==='owner'}
@@ -1175,12 +1175,15 @@ function dOp(id){cfm('¿Eliminar esta oportunidad?',()=>{const o=S.opps.find(x=>
 /* WAZZUP */
 function pV(){const vs=vAct();if(!vs.length)return'';if(S.config.dist==='aleatoria')return vs[Math.floor(Math.random()*vs.length)].id;let mn=Infinity,p=vs[0].id;vs.forEach(v=>{const n=S.conversaciones.filter(c=>c.vendedorId===v.id).length;if(n<mn){mn=n;p=v.id}});return p}
 function borrarTodasConv(){
-if(!isAdminView()){tst('Solo el administrador puede borrar');return}
+if(!isOwnerView()){tst('Solo el dueño puede borrar');return}
 const n=S.conversaciones.length;
 if(!n){tst('No hay conversaciones para borrar');return}
 cfm('¿Borrar TODAS las conversaciones ('+n+')? Esta acción no se puede deshacer.',()=>{
  log('Eliminó','Conversación','Borró todas las conversaciones ('+n+')',{cantidad:n},null);
- S.conversaciones=[];S.ui.wzAc=null;sv();rA();tst('Conversaciones borradas')
+ S.conversaciones=[];S.ui.wzAc=null;sv();rA();tst('Conversaciones borradas');
+ // Vaciar el buffer del servidor para que no se recreen al recargar
+ const _url=(WA_SERVER||S.config.serverUrl||'').trim();
+ if(_url)fetch(_url+'/api/clear-buffer',{method:'POST',headers:{'x-api-key':S.config.apiKey||'','ngrok-skip-browser-warning':'true'}}).catch(()=>{});
 },'Borrar todo')
 }
 function recibirMensaje(tel,nm,tx,at,wid){
@@ -1455,6 +1458,7 @@ h+='</tbody></table></div>';w.innerHTML=h}
 function rAdm(){const w=document.getElementById('admW');if(!w)return;const va=S.ui.viewAs;const cur=va||'admin';
 let h='<div class="admgrid">';
 h+=`<button class="admbtn ${cur==='admin'?'on':''}" onclick="setViewAs('admin')"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg><span>Dueño (vos)<span class="rl">Acceso total</span></span></button>`;
+h+=`<button class="admbtn ${cur==='roladmin'?'on':''}" onclick="setViewAs('roladmin')"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg><span>Administrador<span class="rl">Vista de jefe</span></span></button>`;
 h+=vAct().map(v=>`<button class="admbtn ${cur===v.id?'on':''}" onclick="setViewAs('${v.id}')"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 12 0v1"/></svg><span>${esc(v.nombre)}<span class="rl">Vendedor</span></span></button>`).join('');
 h+=`<button class="admbtn ${cur==='sinrol'?'on':''}" onclick="setViewAs('sinrol')"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><line x1="5" y1="3" x2="19" y2="21"/></svg><span>Usuario sin rol<span class="rl">Sólo bienvenida</span></span></button>`;
 h+='</div>';
